@@ -1,4 +1,3 @@
-// #[macro_use]
 extern crate simple_error;
 extern crate text_io;
 
@@ -8,11 +7,10 @@ const HEIGHT: usize = 6;
 const NUM_PLAYERS: usize = 2;
 const DEFAULT_PLAYERS: [char; 2]  = ['A', 'B'];
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(PartialEq)]
 enum State {
-    Initialized,
     Playing,
-    Ended,
+    Ended(String),
 }
 
 enum Direction {
@@ -48,21 +46,23 @@ struct Game {
     board: [[char; HEIGHT]; WIDTH],
     players: [char; NUM_PLAYERS],
     curr_player: usize,
+    move_count: usize,
     status: State,
 }
 
 impl Game {
     pub fn new() -> Self {
         return Self{
-            board: [['O'; HEIGHT]; WIDTH],
+            board: [[' '; HEIGHT]; WIDTH],
             players: DEFAULT_PLAYERS,
             curr_player: 0,
-            status: State::Initialized,
+            move_count: 0,
+            status: State::Playing,
         };
     }
 
     pub fn play(&mut self) {
-        while self.status != State::Ended {
+        while !matches!(self.status, State::Ended(_)) {
             self.print();
             let mut result: Result<_, _> = Err(simple_error::simple_error!(""));
             while result.is_err() {
@@ -80,22 +80,26 @@ impl Game {
             println!();
         }
         self.print();
-        println!("Game over, player {} wins!", self.players[self.curr_player])
+
+        let State::Ended(msg) = &self.status else { panic!() };
+        println!("{}", msg);
     }
 
     fn try_drop(&mut self, c: usize) -> simple_error::SimpleResult<()> {
         for r in 0..HEIGHT {
-            if self.board[c][r] != 'O' {
+            if self.board[c][r] != ' ' {
                 continue;
             }
             self.board[c][r] = self.players[self.curr_player];
             if self.check_win(&[c as i32, r as i32]) {
-                self.status = State::Ended;
+                self.status = State::Ended(format!("Game over, player {} wins!", self.players[self.curr_player]));
             } else {
-                self.curr_player += 1;
-                if self.curr_player >= self.players.len() {
-                    self.curr_player = 0;
+                self.move_count += 1;
+                if self.move_count == HEIGHT * WIDTH {
+                    self.status = State::Ended(String::from("Game over, draw!"));
+                    return Ok(());
                 }
+                self.curr_player = self.move_count % 2;
             }
             return Ok(());
         }
